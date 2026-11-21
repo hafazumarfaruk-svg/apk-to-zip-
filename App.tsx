@@ -44,6 +44,44 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : "An unexpected error occurred.";
 }
 
+// react-native-zip-archive (native) expects a plain file path, not a file:// URI.
+// Passing "file:///..." makes the native zip library fail with
+// "Zip headers not found. Probably not a zip file".
+function toNativePath(uri: string): string {
+  const withoutScheme = uri.replace(/^file:\/\//, "");
+  try {
+    return decodeURI(withoutScheme);
+  } catch {
+    return withoutScheme;
+  }
+}
+
+// Every valid APK/ZIP starts with the bytes "PK" (base64 of "PK.." begins with "UEs").
+async function assertLooksLikeZip(uri: string, label: string): Promise<void> {
+  const info = await FileSystem.getInfoAsync(uri);
+  if (!info.exists || info.isDirectory) {
+    throw new Error(`${label}: the file could not be found after copying.`);
+  }
+  if (!info.size || info.size < 22) {
+    throw new Error(
+      `${label}: the copied file is empty or incomplete (${info.size ?? 0} bytes). ` +
+        "Please pick the APK again, or copy it to local storage first.",
+    );
+  }
+
+  const header = await FileSystem.readAsStringAsync(uri, {
+    encoding: FileSystem.EncodingType.Base64,
+    position: 0,
+    length: 4,
+  });
+  if (!header.startsWith("UEs")) {
+    throw new Error(
+      `${label}: this file is not a valid APK/ZIP archive. ` +
+        "It may be corrupted, encrypted, or a different format (e.g. XAPK/APKS bundle).",
+    );
+  }
+}
+
 export default function App() {
   const [selectedApk, setSelectedApk] = useState<PickedApk | null>(null);
   const [convertedZip, setConvertedZip] = useState<ConvertedZip | null>(null);
@@ -116,6 +154,9 @@ export default function App() {
         to: copiedApkUri,
       });
 
+      setStage("Checking APK file…");
+      await assertLooksLikeZip(copiedApkUri, "APK check failed");
+
       const extractedDirectory = `${workingDirectory}extracted/`;
       await FileSystem.makeDirectoryAsync(extractedDirectory, {
         intermediates: true,
@@ -127,7 +168,10 @@ export default function App() {
         setProgress(currentProgress);
       });
       try {
-        await unzip(copiedApkUri, extractedDirectory);
+        await unzip(
+          toNativePath(copiedApkUri),
+          toNativePath(extractedDirectory),
+        );
       } finally {
         unzipSubscription.remove();
       }
@@ -139,7 +183,7 @@ export default function App() {
       });
       try {
         await FileSystem.deleteAsync(outputUri, { idempotent: true });
-        await zip(extractedDirectory, outputUri);
+        await zip(toNativePath(extractedDirectory), toNativePath(outputUri));
       } finally {
         zipSubscription.remove();
       }
