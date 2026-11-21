@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "APK to ZIP Converter",
+    "slug": "apk-to-zip",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.hafazumarfaruk.apktozip"
+    },
+    "plugins": [
+      "expo-document-picker",
+      "react-native-zip-archive"
+    ]
+  }
+}
