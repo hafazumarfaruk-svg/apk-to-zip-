@@ -14,6 +14,11 @@
     "plugins": [
       "expo-document-picker",
       "react-native-zip-archive"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b994c276-7f8a-4769-8c87-c8a70a4d5e79"
+      }
+    }
   }
 }
